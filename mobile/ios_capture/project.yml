@@ -1,0 +1,46 @@
+name: SweepSpike
+options:
+  bundleIdPrefix: com.dm360
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+targets:
+  SweepSpike:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    info:
+      path: SweepSpike-Info.plist
+      properties:
+        CFBundleDisplayName: SweepSpike
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSCameraUsageDescription: >-
+          SweepSpike uses the camera to capture the 360 degree panorama frames
+          that make up a sweep.
+        NSPhotoLibraryAddUsageDescription: >-
+          SweepSpike saves the stitched panorama to your photo library so you
+          can inspect its quality.
+    settings:
+      base:
+        # Apple requires this to be globally unique, even for a free personal team.
+        # If Xcode says the identifier is unavailable, change dm360 to something of
+        # your own here and re-run `xcodegen generate`.
+        PRODUCT_BUNDLE_IDENTIFIER: com.dm360.sweepspike
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: NO
+        # Let Xcode create and renew the provisioning profile itself. With a free
+        # Apple ID the profile lasts 7 days, after which the app stops launching and
+        # must be re-run from Xcode — that is Apple's limit, not a bug here.
+        CODE_SIGN_STYLE: Automatic
+        # Set your Team ID here so it SURVIVES `xcodegen generate`. Setting it only in
+        # Xcode's Signing & Capabilities tab writes it into the .xcodeproj, which this
+        # spec regenerates and overwrites. Find it after adding your Apple ID with:
+        #   xcodebuild -showBuildSettings -project SweepSpike.xcodeproj 2>/dev/null \
+        #     | grep DEVELOPMENT_TEAM
+        # or in Xcode > Settings > Accounts > (your ID) > Manage Certificates.
+        DEVELOPMENT_TEAM: "48CX4994MD"

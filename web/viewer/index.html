@@ -1,0 +1,513 @@
+<title>SweepSpike — 360° Room View</title>
+<style>
+  :root {
+    --ink: #0B1219;
+    --panel: #131C25;
+    --line: #24313D;
+    --paper: #EFEAE1;
+    --text: #EFEAE1;
+    --muted: #78838E;
+    --amber: #D9963C;
+    --cyan: #57AFC0;
+    --radius: 4px;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  :root[data-theme="light"] {
+    --ink: #E8E3D9;
+    --panel: #F5F2EC;
+    --line: #D2CABB;
+    --text: #17202A;
+    --muted: #6B7480;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ink: #E8E3D9;
+      --panel: #F5F2EC;
+      --line: #D2CABB;
+      --text: #17202A;
+      --muted: #6B7480;
+    }
+  }
+  @media (prefers-color-scheme: light) {
+    :root[data-theme="dark"] {
+      --ink: #0B1219;
+      --panel: #131C25;
+      --line: #24313D;
+      --text: #EFEAE1;
+      --muted: #78838E;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 20px 56px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  header { display: flex; flex-direction: column; gap: 8px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(26px, 4.4vw, 40px);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+  .sub {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  /* Viewer */
+  .stage {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #05090D;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: min(58vh, 520px);
+    cursor: grab;
+    touch-action: none;
+  }
+  canvas.dragging { cursor: grabbing; }
+
+  .stage.drop { outline: 2px dashed var(--amber); outline-offset: -6px; }
+
+  .reticle {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: grid;
+    place-items: center;
+    opacity: 0.5;
+  }
+  .reticle span {
+    width: 22px; height: 22px;
+    border: 1px solid rgba(239,234,225,0.55);
+    border-radius: 50%;
+  }
+  .reticle span::before,
+  .reticle span::after {
+    content: "";
+    position: absolute;
+    background: rgba(239,234,225,0.55);
+  }
+  .reticle span::before { width: 1px; height: 8px; top: -12px; left: 50%; }
+  .reticle span::after { width: 8px; height: 1px; left: -12px; top: 50%; }
+
+  .hint {
+    position: absolute;
+    left: 12px; bottom: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(239,234,225,0.62);
+    background: rgba(5,9,13,0.55);
+    padding: 5px 9px;
+    border-radius: var(--radius);
+    transition: opacity 240ms ease;
+  }
+  .hint.gone { opacity: 0; }
+
+  /* Instrument bar */
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 22px;
+    padding: 11px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .read { display: flex; align-items: baseline; gap: 8px; }
+  .read b {
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .read span {
+    color: var(--cyan);
+    font-variant-numeric: tabular-nums;
+    min-width: 6ch;
+  }
+  .spacer { flex: 1 1 auto; }
+
+  .toggle { display: flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .toggle button {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .toggle button[aria-pressed="true"] { background: var(--amber); color: #12181E; }
+  .toggle button:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+
+  /* Specs */
+  .specs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .spec { background: var(--panel); padding: 13px 15px; display: flex; flex-direction: column; gap: 5px; }
+  .spec dt {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .spec dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .spec dd em { font-style: normal; color: var(--amber); }
+
+  .note {
+    margin: 0;
+    max-width: 68ch;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .note strong { color: var(--text); font-weight: 600; }
+  .note code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    color: var(--cyan);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">SweepSpike · Iteration 0 output</div>
+    <h1>The room, as a 360° view</h1>
+    <p class="sub">
+      Drag to look around. This is the actual output of the capture plan and stitcher —
+      44 simulated frames wrapped back onto a sphere with your eye at its centre.
+    </p>
+  </header>
+
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="reticle"><span></span></div>
+    <div class="hint" id="hint">Drag to look · scroll to zoom</div>
+  </div>
+
+  <div class="bar">
+    <div class="read"><b>Bearing</b><span id="yaw">0.0°</span></div>
+    <div class="read"><b>Elevation</b><span id="pitch">0.0°</span></div>
+    <div class="read"><b>FOV</b><span id="fov">80°</span></div>
+    <div class="spacer"></div>
+    <div class="toggle" role="group" aria-label="View mode">
+      <button id="bSphere" aria-pressed="true">Sphere</button>
+      <button id="bFlat" aria-pressed="false">Flat source</button>
+    </div>
+    <div class="toggle">
+      <button id="bOpen">Open panorama…</button>
+    </div>
+    <input id="file" type="file" accept="image/*" hidden>
+  </div>
+
+  <dl class="specs">
+    <div class="spec"><dt>Capture targets</dt><dd>44</dd></div>
+    <div class="spec"><dt>Sphere covered</dt><dd><em>100%</em></dd></div>
+    <div class="spec"><dt>Seam overlap</dt><dd>90.5%</dd></div>
+    <div class="spec"><dt>Stitch time</dt><dd>0.44<em>s</em></dd></div>
+    <div class="spec"><dt>Source</dt><dd>4096×2048</dd></div>
+  </dl>
+
+  <p class="note">
+    Switch to <strong>Flat source</strong> to see what is actually stored: an equirectangular
+    image, the sphere unwrapped onto a rectangle. It is the same format Street View and Matterport
+    use. The curving grid near the top edge is the ceiling being stretched flat — the viewer
+    undoes that projection. Every pixel already carries a known direction, so wrapping it back is
+    exact, not an approximation: longitude is <code>x</code>, latitude is <code>y</code>.
+  </p>
+  <p class="note">
+    To view your own capture: finish a sweep in the app, tap <strong>Share</strong>, and send the
+    panorama here by AirDrop or Files — then <strong>Open panorama…</strong>, or just drag the file
+    onto the view. Nothing is uploaded; the image is read locally in your browser.
+  </p>
+  <p class="note">
+    The room here is synthetic — four toned walls, a blown-out window, a 5° grid chosen because
+    misalignment breaks grid lines where a smooth gradient would hide it. Frames were rendered
+    with the ±8° aiming error the app actually allows. Grid lines stay continuous across frame
+    boundaries, which is what "no visible seams" looks like when you can measure it.
+  </p>
+</div>
+
+<script>
+(function () {
+  // Panorama to display. Replace with the Supabase public URL of a stitched sweep,
+  // or pass ?pano=<url> to load one at runtime.
+  var IMG = new URLSearchParams(location.search).get("pano") || "panorama.jpg";
+
+  var canvas = document.getElementById("c");
+  var gl = canvas.getContext("webgl", { antialias: false, alpha: false });
+  if (!gl) { canvas.outerHTML = '<p class="note" style="padding:24px">WebGL is unavailable in this browser, so the 360° view cannot render.</p>'; return; }
+
+  var VERT =
+    "attribute vec2 aPos;varying vec2 vUv;" +
+    "void main(){vUv=aPos;gl_Position=vec4(aPos,0.0,1.0);}";
+
+  // Per-pixel ray direction, then the same equirect mapping the stitcher used:
+  // lon = atan2(x, -z), lat = asin(y). Inverting it here is exact.
+  var FRAG =
+    "precision highp float;varying vec2 vUv;uniform sampler2D uTex;" +
+    "uniform vec2 uRes;uniform float uYaw,uPitch,uFov,uFlat;" +
+    "const float PI=3.14159265359;" +
+    "void main(){" +
+    " float aspect=uRes.x/uRes.y;" +
+    " if(uFlat>0.5){" +
+    "   vec2 f=vec2(vUv.x*0.5+0.5, 0.5-vUv.y*0.5);" +
+    "   float target=2.0;" +
+    "   if(aspect>target){ f.x=(vUv.x*aspect/target)*0.5+0.5; }" +
+    "   else { f.y=0.5-(vUv.y*target/aspect)*0.5; }" +
+    "   if(f.x<0.0||f.x>1.0||f.y<0.0||f.y>1.0){gl_FragColor=vec4(0.02,0.035,0.05,1.0);return;}" +
+    "   gl_FragColor=texture2D(uTex,f);return;" +
+    " }" +
+    " float t=tan(uFov*0.5);" +
+    " vec3 d=normalize(vec3(vUv.x*t*aspect, vUv.y*t, -1.0));" +
+    " float cp=cos(uPitch),sp=sin(uPitch);" +
+    " d=vec3(d.x, d.y*cp-d.z*sp, d.y*sp+d.z*cp);" +
+    " float cy=cos(uYaw),sy=sin(uYaw);" +
+    " d=vec3(d.x*cy+d.z*sy, d.y, -d.x*sy+d.z*cy);" +
+    " float lon=atan(d.x,-d.z);" +
+    " float lat=asin(clamp(d.y,-1.0,1.0));" +
+    " gl_FragColor=texture2D(uTex, vec2(lon/(2.0*PI)+0.5, 0.5-lat/PI));" +
+    "}";
+
+  function compile(type, src) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    return s;
+  }
+  var prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+  gl.linkProgram(prog); gl.useProgram(prog);
+
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  var aPos = gl.getAttribLocation(prog, "aPos");
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  var uRes = gl.getUniformLocation(prog, "uRes"),
+      uYaw = gl.getUniformLocation(prog, "uYaw"),
+      uPitch = gl.getUniformLocation(prog, "uPitch"),
+      uFov = gl.getUniformLocation(prog, "uFov"),
+      uFlat = gl.getUniformLocation(prog, "uFlat");
+
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([20,28,36]));
+  // No mipmaps: mip selection across the longitude seam draws a visible line.
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  var maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+
+  var img = new Image();
+  img.onload = function () {
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+
+    // Phones can produce panoramas wider than this GPU's texture limit, and exceeding it
+    // fails silently (black sphere) rather than throwing. Downscale through a canvas
+    // instead, preserving the 2:1 equirect ratio.
+    var source = img;
+    if (img.width > maxTex) {
+      var scaled = document.createElement("canvas");
+      scaled.width = maxTex;
+      scaled.height = Math.round(maxTex * img.height / img.width);
+      scaled.getContext("2d").drawImage(img, 0, 0, scaled.width, scaled.height);
+      source = scaled;
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source);
+    draw();
+  };
+  img.onerror = function () {
+    var h = document.getElementById("hint");
+    h.classList.remove("gone");
+    h.textContent = "Could not read that image";
+  };
+  img.src = IMG;
+
+  // Bring a panorama over from the phone: AirDrop or save it, then open it here.
+  // Everything runs locally — the file is never uploaded anywhere.
+  function loadFile(file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      yaw = 0; pitch = 0;
+      img.src = e.target.result;
+      var h = document.getElementById("hint");
+      h.textContent = file.name;
+      h.classList.remove("gone");
+      setTimeout(function () { h.classList.add("gone"); }, 2400);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  var fileInput = document.getElementById("file");
+  document.getElementById("bOpen").addEventListener("click", function () { fileInput.click(); });
+  fileInput.addEventListener("change", function (e) { loadFile(e.target.files[0]); });
+
+  var stage = document.querySelector(".stage");
+  ["dragenter", "dragover"].forEach(function (type) {
+    stage.addEventListener(type, function (e) { e.preventDefault(); stage.classList.add("drop"); });
+  });
+  ["dragleave", "drop"].forEach(function (type) {
+    stage.addEventListener(type, function (e) { e.preventDefault(); stage.classList.remove("drop"); });
+  });
+  stage.addEventListener("drop", function (e) {
+    if (e.dataTransfer && e.dataTransfer.files) loadFile(e.dataTransfer.files[0]);
+  });
+
+  var yaw = 0, pitch = 0, fov = 80 * Math.PI / 180, flat = 0;
+  var MINF = 25 * Math.PI / 180, MAXF = 110 * Math.PI / 180;
+  var LIM = Math.PI / 2 - 0.02;
+
+  var elYaw = document.getElementById("yaw"),
+      elPitch = document.getElementById("pitch"),
+      elFov = document.getElementById("fov");
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  }
+
+  function draw() {
+    resize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uYaw, yaw);
+    gl.uniform1f(uPitch, pitch);
+    gl.uniform1f(uFov, fov);
+    gl.uniform1f(uFlat, flat);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    var deg = ((yaw * 180 / Math.PI) % 360 + 360) % 360;
+    elYaw.textContent = deg.toFixed(1) + "°";
+    elPitch.textContent = (pitch * 180 / Math.PI).toFixed(1) + "°";
+    elFov.textContent = Math.round(fov * 180 / Math.PI) + "°";
+  }
+
+  // Slow drift on load, so the page opens by demonstrating that it IS a sphere.
+  var drifting = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var last = 0;
+  function tick(now) {
+    if (drifting) {
+      if (last) { yaw += (now - last) * 0.00006; }
+      last = now;
+      draw();
+      requestAnimationFrame(tick);
+    }
+  }
+  requestAnimationFrame(tick);
+
+  var hint = document.getElementById("hint");
+  function stopDrift() {
+    if (!drifting) return;
+    drifting = false;
+    hint.classList.add("gone");
+  }
+
+  var dragging = false, px = 0, py = 0;
+  canvas.addEventListener("pointerdown", function (e) {
+    dragging = true; px = e.clientX; py = e.clientY;
+    canvas.classList.add("dragging");
+    canvas.setPointerCapture(e.pointerId);
+    stopDrift();
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var s = fov / canvas.clientHeight * 1.1;
+    yaw -= (e.clientX - px) * s;
+    pitch += (e.clientY - py) * s;
+    pitch = Math.max(-LIM, Math.min(LIM, pitch));
+    px = e.clientX; py = e.clientY;
+    draw();
+  });
+  function endDrag(e) {
+    dragging = false;
+    canvas.classList.remove("dragging");
+    if (e && e.pointerId != null && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  canvas.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    stopDrift();
+    fov = Math.max(MINF, Math.min(MAXF, fov + e.deltaY * 0.0016));
+    draw();
+  }, { passive: false });
+
+  var bS = document.getElementById("bSphere"), bF = document.getElementById("bFlat");
+  function setMode(isFlat) {
+    flat = isFlat ? 1 : 0;
+    bS.setAttribute("aria-pressed", String(!isFlat));
+    bF.setAttribute("aria-pressed", String(isFlat));
+    stopDrift();
+    draw();
+  }
+  bS.addEventListener("click", function () { setMode(false); });
+  bF.addEventListener("click", function () { setMode(true); });
+
+  window.addEventListener("resize", draw);
+  draw();
+})();
+</script>

@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Device capture evidence — screen recordings are 10-57 MB each and are referenced
+# by filename from CHANGELOG.md. Kept out of git deliberately; store them alongside
+# the repo or in shared storage. IMG_*.JPG equirects ARE tracked: they are ~1 MB and
+# far more diagnostic than a recording of the viewer.
+*.MP4
+*.mp4
+*.mov
+*.MOV
+
+# Local agent/tooling state
+.claude-flow/
+.swarm/
+ruvector.db
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# Preserved history of the former nested repo at mobile/ios_capture (single commit,
+# no remote). Moved aside so this directory could become the repository root.
+.git.disabled/
